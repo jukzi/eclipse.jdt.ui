@@ -15,6 +15,9 @@ package org.eclipse.jdt.internal.ui.javaeditor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+
+import org.eclipse.core.runtime.ILog;
 
 import org.eclipse.jface.action.IAction;
 
@@ -75,7 +78,7 @@ public class JavaElementHyperlinkDetector extends AbstractHyperlinkDetector {
 	private static IRegion fLastWordRegion;
 
 	private static IJavaElement[] fLastElements;
-
+	private static String lastErrorMsg;
 	/*
 	 * @see org.eclipse.jface.text.hyperlink.IHyperlinkDetector#detectHyperlinks(org.eclipse.jface.text.ITextViewer, org.eclipse.jface.text.IRegion, boolean)
 	 */
@@ -125,7 +128,31 @@ public class JavaElementHyperlinkDetector extends AbstractHyperlinkDetector {
 			if (input.equals(fLastInput) && modStamp == fLastModStamp && wordRegion.equals(fLastWordRegion)) {
 				elements= fLastElements;
 			} else {
-				elements= input.codeSelect(wordRegion.getOffset(), wordRegion.getLength());
+				int wordOffset= wordRegion.getOffset();
+				int wordLength= wordRegion.getLength();
+				try {
+					elements= input.codeSelect(wordOffset, wordLength);
+				} catch (RuntimeException e) {
+					// log error and keep going
+					String where= ""; //$NON-NLS-1$
+					where+= textEditor.getTitle();
+					where+= " at offset " + wordOffset; //$NON-NLS-1$
+					where+= " with length " + wordLength; //$NON-NLS-1$
+					try {
+						int lineOfOffset= document.getLineOfOffset(wordOffset);
+						where+= " line " + (lineOfOffset + 1); //$NON-NLS-1$
+						int CONTEXT_LINES= 10;
+						int lineOffset= document.getLineOffset(Math.max(0, lineOfOffset - CONTEXT_LINES));
+						where+= " :\n" + document.get(lineOffset, wordOffset - lineOffset) + '|' + document.get(wordOffset, wordLength); //$NON-NLS-1$
+					} catch (BadLocationException e1) {
+						e1.printStackTrace();
+					}
+					if (!Objects.equals(lastErrorMsg, where)) { // avoid repetitive logging
+						lastErrorMsg= where;
+						ILog.get().error("RuntimeException computing hyperlink for " + where, e); //$NON-NLS-1$
+					}
+					return null;
+				}
 				elements= selectOpenableElements(elements);
 				fLastInput= input;
 				fLastModStamp= modStamp;
@@ -143,7 +170,6 @@ public class JavaElementHyperlinkDetector extends AbstractHyperlinkDetector {
 				return null;
 
 			return CollectionsUtil.toArray(links, IHyperlink.class);
-
 		} catch (JavaModelException e) {
 			return null;
 		}

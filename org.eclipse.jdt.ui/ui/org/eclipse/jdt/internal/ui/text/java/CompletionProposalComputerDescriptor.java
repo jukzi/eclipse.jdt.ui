@@ -382,7 +382,8 @@ final class CompletionProposalComputerDescriptor {
 				int lineOfOffset= doc.getLineOfOffset(context.getInvocationOffset());
 				where+= " line " + (lineOfOffset + 1); //$NON-NLS-1$
 				int CONTEXT_LINES= 10;
-				where+= " :\n" + doc.get(doc.getLineOffset(Math.max(0, lineOfOffset - CONTEXT_LINES)), context.getInvocationOffset()) + '|'; //$NON-NLS-1$
+				int lineOffset= doc.getLineOffset(Math.max(0, lineOfOffset - CONTEXT_LINES));
+				where+= " :\n" + doc.get(lineOffset, context.getInvocationOffset() - lineOffset) + '|'; //$NON-NLS-1$
 			} catch (BadLocationException e1) {
 			}
 			if (!Objects.equals(lastErrorMsg, where)) { // avoid repetitive logging
